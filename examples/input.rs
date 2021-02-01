@@ -1,7 +1,7 @@
 use muroba::Input;
 
 fn main() {
-    let name = Input::new()
+    let name = Input::default()
         .with_prompt("Hello! What's your name?")
         .interact()
         .unwrap();
