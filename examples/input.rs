@@ -1,7 +1,7 @@
-use muroba::{Input, Interactive, Promptable};
+use muroba::{Interactive, Promptable, style::{DefaultStyle, Style}};
 
 fn main() {
-    let name = Input::default()
+    let name = DefaultStyle::input()
         .with_prompt("Hello! What's your name?")
         .interact()
         .unwrap();
