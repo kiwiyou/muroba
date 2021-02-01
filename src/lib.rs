@@ -1,5 +1,5 @@
 use std::{
-    io::{stderr, stdin},
+    io::{stderr, stdin, Write},
     marker::PhantomData,
 };
 
@@ -7,46 +7,64 @@ use style::{DefaultStyle, Style};
 
 pub mod style;
 
+pub trait Interactive<S: Style>: Sized {
+    type Result;
+    fn interact(self) -> crossterm::Result<Self::Result> {
+        self.interact_on(&mut stderr())
+    }
+    fn interact_on(self, f: &mut impl Write) -> crossterm::Result<Self::Result>;
+}
+
+pub struct Prompted<S: Style, I: Interactive<S>> {
+    inner: I,
+    prompt: String,
+    _style: PhantomData<S>,
+}
+
+impl<S: Style, I: Interactive<S, Result = R>, R> Interactive<S> for Prompted<S, I> {
+    type Result = R;
+
+    fn interact_on(self, f: &mut impl Write) -> crossterm::Result<Self::Result> {
+        S::queue_prompt(f, self.prompt)?;
+        self.inner.interact_on(f)
+    }
+}
+
+pub trait Promptable<S: Style, I: Interactive<S>> {
+    fn with_prompt(self, prompt: impl Into<String>) -> Prompted<S, I>;
+}
+
+impl<S: Style, I: Interactive<S>> Promptable<S, Self> for I {
+    fn with_prompt(self, prompt: impl Into<String>) -> Prompted<S, Self> {
+        Prompted {
+            inner: self,
+            prompt: prompt.into(),
+            _style: Default::default(),
+        }
+    }
+}
+
 pub struct Input<S: Style> {
-    prompt: Option<String>,
     _style: PhantomData<S>,
 }
 
 impl Default for Input<DefaultStyle> {
     fn default() -> Self {
         Self {
-            prompt: None,
             _style: Default::default(),
         }
     }
 }
 
-impl<S: Style> Input<S> {
-    fn with_style() -> Self {
-        Self {
-            prompt: None,
-            _style: Default::default(),
-        }
-    }
+impl<S: Style> Interactive<S> for Input<S> {
+    type Result = String;
 
-    pub fn with_prompt(self, prompt: impl Into<String>) -> Self {
-        Self {
-            prompt: Some(prompt.into()),
-            _style: self._style,
-        }
-    }
-
-    pub fn interact(self) -> crossterm::Result<String> {
-        let mut stderr = stderr();
-        if let Some(prompt) = self.prompt {
-            S::queue_prompt(&mut stderr, prompt)?;
-        }
-        S::queue_indicator(&mut stderr)?;
-        S::format_input(&mut stderr)?;
+    fn interact_on(self, f: &mut impl Write) -> crossterm::Result<Self::Result> {
+        S::format_input(f)?;
         let mut input = String::new();
         let stdin = stdin();
         stdin.read_line(&mut input)?;
-        S::unformat_input(&mut stderr)?;
+        S::unformat_input(f)?;
         input.truncate(input.trim_end().len());
         Ok(input)
     }

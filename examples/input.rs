@@ -1,4 +1,4 @@
-use muroba::Input;
+use muroba::{Input, Interactive, Promptable};
 
 fn main() {
     let name = Input::default()
