@@ -1,7 +1,7 @@
 use std::{io::{stderr, stdin, Write}, marker::PhantomData, writeln};
 
 use crossterm::{cursor, event::{Event, KeyCode}, queue, terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode}};
-use cursor::{MoveTo, MoveToColumn, MoveToPreviousLine};
+use cursor::{Hide, MoveTo, MoveToColumn, MoveToPreviousLine, Show};
 use style::Style;
 
 pub mod style;
@@ -99,7 +99,11 @@ impl<S: Style, T: AsRef<str>> Interactive<S> for Select<'_, S, T> {
             S::print_list_item(f, choice.as_ref(), current)?;
             writeln!(f)?;
         }
-        queue!(f, MoveToPreviousLine(self.choices.len() as u16))?;
+        queue!(
+            f,
+            MoveToPreviousLine(self.choices.len() as u16),
+            Hide,
+        )?;
         enable_raw_mode()?;
         loop {
             if let Event::Key(event) = crossterm::event::read()? {
@@ -142,6 +146,7 @@ impl<S: Style, T: AsRef<str>> Interactive<S> for Select<'_, S, T> {
             Clear(ClearType::FromCursorDown),
             MoveToPreviousLine(1),
             MoveToColumn(return_x + 1),
+            Show,
         )?;
         S::format_input(f)?;
         write!(f, "{}", self.choices[cursor].as_ref())?;
