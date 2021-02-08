@@ -1,6 +1,10 @@
 use std::io::Write;
 
-use crossterm::{Result, queue, style::{Color, Colorize, Print, PrintStyledContent, ResetColor, SetForegroundColor, Styler}};
+use crossterm::{
+    queue,
+    style::{Color, Colorize, Print, PrintStyledContent, ResetColor, SetForegroundColor, Styler},
+    Result,
+};
 
 use crate::{Input, Select};
 
@@ -49,21 +53,10 @@ impl Style for DefaultStyle {
 
     fn print_list_item(f: &mut impl Write, item: &str, current: bool) -> Result<()> {
         if current {
-            queue!(
-                f,
-                SetForegroundColor(Color::Blue),
-                Print("> "),
-            )?;
+            queue!(f, SetForegroundColor(Color::Blue), Print("> "),)?;
         } else {
-            queue!(
-                f,
-                Print("  "),
-            )?;
+            queue!(f, Print("  "),)?;
         }
-        queue!(
-            f,
-            Print(item),
-            ResetColor,
-        )
+        queue!(f, Print(item), ResetColor,)
     }
 }

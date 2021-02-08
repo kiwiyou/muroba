@@ -1,4 +1,7 @@
-use muroba::{Interactive, Promptable, style::{DefaultStyle, Style}};
+use muroba::{
+    style::{DefaultStyle, Style},
+    Interactive, Promptable,
+};
 
 fn main() {
     let name = DefaultStyle::input()

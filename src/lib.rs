@@ -1,6 +1,15 @@
-use std::{io::{stderr, stdin, Write}, marker::PhantomData, writeln};
+use std::{
+    io::{stderr, stdin, Write},
+    marker::PhantomData,
+    writeln,
+};
 
-use crossterm::{cursor, event::{Event, KeyCode}, queue, terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode}};
+use crossterm::{
+    cursor,
+    event::{Event, KeyCode},
+    queue,
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
+};
 use cursor::{Hide, MoveTo, MoveToColumn, MoveToPreviousLine, Show};
 use style::Style;
 
@@ -20,7 +29,9 @@ pub struct Prompted<S: Style, I: Interactive<S>, T: AsRef<str>> {
     _style: PhantomData<S>,
 }
 
-impl<S: Style, I: Interactive<S, Result = R>, R, T: AsRef<str>> Interactive<S> for Prompted<S, I, T> {
+impl<S: Style, I: Interactive<S, Result = R>, R, T: AsRef<str>> Interactive<S>
+    for Prompted<S, I, T>
+{
     type Result = R;
 
     fn interact_on(self, f: &mut impl Write) -> crossterm::Result<Self::Result> {
@@ -94,46 +105,28 @@ impl<S: Style, T: AsRef<str>> Interactive<S> for Select<'_, S, T> {
         let (return_x, _) = cursor::position()?;
         writeln!(f)?;
         let mut cursor = 0;
-        for (i , choice) in self.choices.iter().enumerate() {
+        for (i, choice) in self.choices.iter().enumerate() {
             let current = i == cursor;
             S::print_list_item(f, choice.as_ref(), current)?;
             writeln!(f)?;
         }
-        queue!(
-            f,
-            MoveToPreviousLine(self.choices.len() as u16),
-            Hide,
-        )?;
+        queue!(f, MoveToPreviousLine(self.choices.len() as u16), Hide,)?;
         enable_raw_mode()?;
         loop {
             if let Event::Key(event) = crossterm::event::read()? {
                 let (_, mut y) = cursor::position()?;
+                queue!(f, MoveToColumn(0), Clear(ClearType::CurrentLine),)?;
+                S::print_list_item(f, self.choices[cursor].as_ref(), false)?;
                 if event.code == KeyCode::Down && cursor < self.choices.len() - 1 {
-                    queue!(
-                        f,
-                        MoveToColumn(0),
-                        Clear(ClearType::CurrentLine),
-                    )?;
-                    S::print_list_item(f, self.choices[cursor].as_ref(), false)?;
                     cursor += 1;
                     y += 1;
                 } else if event.code == KeyCode::Up && cursor > 0 {
-                    queue!(
-                        f,
-                        MoveToColumn(0),
-                        Clear(ClearType::CurrentLine),
-                    )?;
-                    S::print_list_item(f, self.choices[cursor].as_ref(), false)?;
                     cursor -= 1;
                     y -= 1;
                 } else if event.code == KeyCode::Enter {
-                    break
+                    break;
                 }
-                queue!(
-                    f,
-                    MoveTo(0, y),
-                    Clear(ClearType::CurrentLine),
-                )?;
+                queue!(f, MoveTo(0, y), Clear(ClearType::CurrentLine),)?;
                 S::print_list_item(f, self.choices[cursor].as_ref(), true)?;
                 f.flush()?;
             }
