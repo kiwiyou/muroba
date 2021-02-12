@@ -6,7 +6,7 @@ use crossterm::{
     Result,
 };
 
-use crate::{Input, Select, DynamicSelect};
+use crate::{DynamicSelect, Input, Select};
 
 pub trait Style: Sized {
     fn print_prompt(f: &mut impl Write, prompt: &str) -> Result<()>;

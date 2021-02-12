@@ -51,7 +51,7 @@ impl<S: Style, I: Interactive<S>> Promptable<S, Self> for I {
     fn with_prompt<T: AsRef<str>>(self, prompt: T) -> Prompted<S, Self, T> {
         Prompted {
             inner: self,
-            prompt: prompt.into(),
+            prompt,
             _style: Default::default(),
         }
     }
@@ -66,6 +66,12 @@ impl<S: Style> Input<S> {
         Self {
             _style: Default::default(),
         }
+    }
+}
+
+impl<S: Style> Default for Input<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -196,7 +202,7 @@ impl<
         }
         queue!(f, Print('\n'))?;
         lines += 1;
-        for (i, item) in choices.into_iter().enumerate() {
+        for (i, item) in choices.iter().enumerate() {
             let current = i == cursor;
             S::print_list_item(f, item.as_ref(), current)?;
             queue!(f, Print('\n'))?;
