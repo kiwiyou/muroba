@@ -427,12 +427,10 @@ impl<
         )?;
         if cursor < choices.len() {
             let choice = choices.remove(cursor);
-            queue!(
-                f,
-                MoveToPreviousLine(1),
-                MoveToColumn(result_x + 1),
-                Print(choice.as_ref()),
-            )?;
+            queue!(f, MoveToPreviousLine(1), MoveToColumn(result_x + 1),)?;
+            S::format_input(f)?;
+            queue!(f, Print(choice.as_ref()))?;
+            S::unformat_input(f)?;
             writeln!(f)?;
             Ok(Some(choice))
         } else {
@@ -460,6 +458,8 @@ fn print_choices_sized<S: Style, T: AsRef<str>>(
     } else {
         cursor
     };
+
+    let height = std::cmp::min(len, height as usize) as u16;
 
     if len > 0 {
         for i in from..from + height as usize {
