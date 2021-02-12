@@ -35,11 +35,9 @@ pub trait Style: Sized {
         T: AsRef<str> + Send + 'static,
         F: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
     >(
-        placeholder: impl AsRef<str>,
-        waiting: impl AsRef<str>,
         generator: F,
     ) -> DynamicSelect<Self, T, F> {
-        DynamicSelect::new(placeholder, waiting, generator)
+        DynamicSelect::new(generator)
     }
 }
 
