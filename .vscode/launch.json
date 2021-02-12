@@ -1,0 +1,138 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'muroba'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "muroba",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'input'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=input",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "input",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'input'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=input",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "input",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'variable'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=variable",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "variable",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'variable'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=variable",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "variable",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'select'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=select",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "select",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'select'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=select",
+                    "--package=muroba"
+                ],
+                "filter": {
+                    "name": "select",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

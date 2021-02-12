@@ -6,7 +6,7 @@ use crossterm::{
     Result,
 };
 
-use crate::{Input, Select};
+use crate::{Input, Select, DynamicSelect};
 
 pub trait Style: Sized {
     fn print_prompt(f: &mut impl Write, prompt: &str) -> Result<()>;
@@ -21,12 +21,25 @@ pub trait Style: Sized {
 
     fn print_list_item(f: &mut impl Write, item: &str, current: bool) -> Result<()>;
 
+    fn print_placeholder(f: &mut impl Write, placeholder: &str) -> Result<()>;
+
     fn input() -> Input<Self> {
         Input::new()
     }
 
     fn select<T: AsRef<str>>(choices: &[T]) -> Select<Self, T> {
         Select::new(choices)
+    }
+
+    fn dynamic_select<
+        T: AsRef<str> + Send + 'static,
+        F: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
+    >(
+        placeholder: impl AsRef<str>,
+        waiting: impl AsRef<str>,
+        generator: F,
+    ) -> DynamicSelect<Self, T, F> {
+        DynamicSelect::new(placeholder, waiting, generator)
     }
 }
 
@@ -58,5 +71,9 @@ impl Style for DefaultStyle {
             queue!(f, Print("  "),)?;
         }
         queue!(f, Print(item), ResetColor,)
+    }
+
+    fn print_placeholder(f: &mut impl Write, placeholder: &str) -> Result<()> {
+        queue!(f, PrintStyledContent(placeholder.grey()), ResetColor)
     }
 }
