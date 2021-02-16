@@ -8,10 +8,7 @@ use crossterm::{
     },
 };
 
-use crate::{
-    item::{BeginInput, EndInput, Prompt},
-    Result,
-};
+use crate::{item::*, Result};
 
 pub struct DefaultStyle;
 
@@ -44,5 +41,33 @@ impl Styler<BeginInput> for DefaultStyle {
 impl Styler<EndInput> for DefaultStyle {
     fn style(&self, f: &mut impl Write, _: EndInput) -> Result<()> {
         queue!(f, ResetColor,)
+    }
+}
+
+impl Styler<ConfirmChoice> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, ConfirmChoice(default): ConfirmChoice) -> Result<()> {
+        match default {
+            None => {
+                queue!(f, Print(" [y/n]"))
+            }
+            Some(true) => {
+                queue!(
+                    f,
+                    Print(" ["),
+                    PrintStyledContent("Y".underlined()),
+                    ResetColor,
+                    Print("/n]")
+                )
+            }
+            Some(false) => {
+                queue!(
+                    f,
+                    Print(" [y/"),
+                    PrintStyledContent("N".underlined()),
+                    ResetColor,
+                    Print("]")
+                )
+            }
+        }
     }
 }

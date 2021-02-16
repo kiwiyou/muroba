@@ -17,3 +17,8 @@ pub struct BeginInput;
 ///
 /// It is responsible for restoring the console state after [`BeginInput`] is displayed.
 pub struct EndInput;
+
+/// Represents possible values of [`ConfirmQuery`].
+///
+/// It contains a default choice.
+pub struct ConfirmChoice(pub Option<bool>);

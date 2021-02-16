@@ -1,8 +1,11 @@
-use std::io::{stderr, stdin, Write};
+use std::io::{stderr, Write};
 
 use crate::item::{BeginInput, EndInput, Prompt};
 use crate::style::{DefaultStyle, Styler};
 use crate::Result;
+
+mod input;
+use input::InputQuery;
 
 pub struct QueryBuilder<'a, S>
 where
@@ -40,18 +43,6 @@ impl Default for QueryBuilder<'_, DefaultStyle> {
     }
 }
 
-impl<'a, S> QueryBuilder<'a, S>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-{
-    pub fn input(self) -> InputQuery<'a, S> {
-        InputQuery {
-            prompt: Prompt(self.prompt.unwrap_or_default()),
-            style: self.style,
-        }
-    }
-}
-
 pub trait Query: Sized {
     type Result;
 
@@ -60,32 +51,4 @@ pub trait Query: Sized {
     }
 
     fn show_on(self, f: &mut impl Write) -> Result<Self::Result>;
-}
-
-pub struct InputQuery<'a, S>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-{
-    prompt: Prompt,
-    style: &'a S,
-}
-
-impl<'a, S> Query for InputQuery<'a, S>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-{
-    type Result = String;
-
-    fn show_on(self, f: &mut impl Write) -> Result<Self::Result> {
-        let Self { prompt, style } = self;
-
-        style.style(f, prompt)?;
-        style.style(f, BeginInput)?;
-        let mut input = String::new();
-        stdin().read_line(&mut input)?;
-        style.style(f, EndInput)?;
-
-        input.truncate(input.trim_end_matches(['\n', '\r'].as_ref()).len());
-        Ok(input)
-    }
 }
