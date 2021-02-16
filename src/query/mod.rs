@@ -1,11 +1,10 @@
 use std::io::{stderr, Write};
 
-use crate::item::{BeginInput, EndInput, Prompt};
+use crate::item::Prompt;
 use crate::style::{DefaultStyle, Styler};
 use crate::Result;
 
 mod input;
-use input::InputQuery;
 
 pub struct QueryBuilder<'a, S>
 where
