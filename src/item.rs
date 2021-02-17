@@ -22,3 +22,13 @@ pub struct EndInput;
 ///
 /// It contains a default choice.
 pub struct ConfirmChoice(pub Option<bool>);
+
+/// Represents an element in a list, which is used by select-like queries.
+pub struct ListItem<'a, T> {
+    /// The item to be shown.
+    pub item: &'a T,
+    /// `true` if the selection cursor is on the item.
+    pub is_cursor: bool,
+    /// `true` if the item is selected.
+    pub is_selected: bool,
+}

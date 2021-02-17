@@ -5,6 +5,10 @@ use crate::style::{DefaultStyle, Styler};
 use crate::Result;
 
 mod input;
+mod select;
+
+pub use input::*;
+pub use select::*;
 
 pub struct QueryBuilder<'a, S>
 where

@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{fmt::Display, io::Write};
 
 use crossterm::{
     execute, queue,
@@ -69,5 +69,24 @@ impl Styler<ConfirmChoice> for DefaultStyle {
                 )
             }
         }
+    }
+}
+
+impl<'a, T> Styler<ListItem<'a, T>> for DefaultStyle
+where
+    T: Display,
+{
+    fn style(&self, f: &mut impl Write, list_item: ListItem<'a, T>) -> Result<()> {
+        if list_item.is_cursor {
+            queue!(f, SetForegroundColor(Color::Blue), Print("> "),)?;
+        } else if list_item.is_selected {
+            queue!(f, SetForegroundColor(Color::Green), Print("✓ "),)?;
+        } else {
+            queue!(f, Print("  "),)?;
+        }
+
+        queue!(f, Print(list_item.item), ResetColor,)?;
+
+        Ok(())
     }
 }

@@ -1,20 +1,19 @@
-use muroba::{
-    style::{DefaultStyle, Style},
-    Interactive, Promptable,
-};
+use muroba::query::{Query, QueryBuilder};
 
 fn main() {
     let choices = ["Apple", "Banana", "Kiwi"];
-    let selected = DefaultStyle::select(&choices)
+    let selected = QueryBuilder::default()
         .with_prompt("Which fruit is your favorite?")
-        .interact()
+        .select(&choices)
+        .show()
         .unwrap();
     println!("Your favorite fruit is {}!", choices[selected]);
 
-    let selected = DefaultStyle::select(LANGUAGES)
-        .with_height(5)
+    let selected = QueryBuilder::default()
         .with_prompt("Which language is your favorite?")
-        .interact()
+        .select(LANGUAGES)
+        .fix_rows(5)
+        .show()
         .unwrap();
     println!("Your favorite language is {}!", LANGUAGES[selected]);
 }
