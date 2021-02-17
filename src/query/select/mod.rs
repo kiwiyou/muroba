@@ -18,11 +18,11 @@ where
     where
         S: Styler<ListItem<'a, T>>,
     {
-        SelectQuery {
-            prompt: Prompt(self.prompt.unwrap_or_default()),
-            style: self.style,
+        SelectQuery::new(
+            Prompt(self.prompt.unwrap_or_default()),
+            self.style,
             list,
-            handler: ListHandler::new(self.style, list),
-        }
+            ListHandler::new(self.style, list),
+        )
     }
 }
