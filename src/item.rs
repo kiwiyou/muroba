@@ -32,3 +32,5 @@ pub struct ListItem {
     /// `true` if the item is selected.
     pub is_selected: bool,
 }
+
+pub struct WaitMessage(pub String);

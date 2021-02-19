@@ -16,7 +16,7 @@ use crossterm::{
 use cursor::Show;
 
 use crate::{
-    item::{BeginInput, EndInput, ListItem, Prompt},
+    item::{BeginInput, EndInput, ListItem, Prompt, WaitMessage},
     query::Query,
     style::Styler,
     Result,
@@ -134,6 +134,8 @@ pub struct DynamicSelectQuery<'a, S, ListGen, HandlerGen> {
     style: &'a S,
     list_gen: ListGen,
     handler_gen: HandlerGen,
+    wait_message: WaitMessage,
+    debounce: Duration,
 }
 
 impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> {
@@ -143,7 +145,20 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
             style,
             list_gen,
             handler_gen,
+            wait_message: WaitMessage("".into()),
+            debounce: Duration::new(0, 0),
         }
+    }
+
+    pub fn wait_message(self, wait_message: impl AsRef<str>) -> Self {
+        Self {
+            wait_message: WaitMessage(wait_message.as_ref().into()),
+            ..self
+        }
+    }
+
+    pub fn debounce(self, debounce: Duration) -> Self {
+        Self { debounce, ..self }
     }
 }
 
@@ -163,13 +178,15 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
             handler_gen: Box::new(move |list| {
                 FixedRowHandler::from_list_handler(handler_gen(list), rows)
             }),
+            wait_message: self.wait_message,
+            debounce: self.debounce,
         }
     }
 }
 
 impl<'a, S, T, H, ListGen, HandlerGen> Query for DynamicSelectQuery<'a, S, ListGen, HandlerGen>
 where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
+    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<WaitMessage>,
     H: SelectHandler<Result = Vec<(usize, String)>> + 'a,
     T: Send + 'static,
     ListGen: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
@@ -183,6 +200,8 @@ where
             style,
             list_gen,
             mut handler_gen,
+            wait_message,
+            debounce,
         } = self;
         let list_gen = Arc::new(list_gen);
 
@@ -206,13 +225,14 @@ where
         let mut handler: Option<H> = None;
 
         const POLL_DURATION: Duration = Duration::from_millis(10);
-        const DEBOUNCE_DURATION: Duration = Duration::from_secs(1);
         let mut debounce_until = Some(Instant::now());
         let mut result = loop {
             if let Ok(new_list) = rx.try_recv() {
                 disable_raw_mode()?;
                 if let Some(mut handler) = handler {
                     handler.clear(f)?;
+                } else {
+                    queue!(f, Clear(ClearType::CurrentLine))?;
                 }
                 queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
                 style.style(f, &prompt)?;
@@ -230,6 +250,8 @@ where
                 disable_raw_mode()?;
                 if let Some(mut handler) = handler {
                     handler.clear(f)?;
+                } else {
+                    queue!(f, Clear(ClearType::CurrentLine))?;
                 }
                 spawn_list_gen(input.clone());
                 handler = None;
@@ -239,6 +261,7 @@ where
                 queue!(f, Print(&input))?;
                 style.style(f, &EndInput)?;
                 writeln!(f)?;
+                style.style(f, &wait_message)?;
                 enable_raw_mode()?;
             }
             if event::poll(POLL_DURATION)? {
@@ -246,13 +269,13 @@ where
                     let redraw = match event.code {
                         KeyCode::Char(c) => {
                             input.push(c);
-                            debounce_until = Some(Instant::now() + DEBOUNCE_DURATION);
+                            debounce_until = Some(Instant::now() + debounce);
                             true
                         }
                         KeyCode::Backspace => {
                             if !input.is_empty() {
                                 input.pop();
-                                debounce_until = Some(Instant::now() + DEBOUNCE_DURATION);
+                                debounce_until = Some(Instant::now() + debounce);
                                 true
                             } else {
                                 false
@@ -274,6 +297,8 @@ where
                         disable_raw_mode()?;
                         if let Some(handler) = &mut handler {
                             handler.clear(f)?;
+                        } else {
+                            queue!(f, Clear(ClearType::CurrentLine))?;
                         }
                         queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
                         style.style(f, &prompt)?;
@@ -283,6 +308,8 @@ where
                         writeln!(f)?;
                         if let Some(handler) = &mut handler {
                             handler.show(f)?;
+                        } else {
+                            style.style(f, &wait_message)?;
                         }
                         enable_raw_mode()?;
                     }

@@ -95,3 +95,14 @@ impl Styler<ListItem> for DefaultStyle {
         Ok(())
     }
 }
+
+impl Styler<WaitMessage> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, WaitMessage(message): &WaitMessage) -> Result<()> {
+        queue!(
+            f,
+            PrintStyledContent(message.as_str().dark_grey().italic()),
+            ResetColor,
+            SetAttribute(Attribute::Reset)
+        )
+    }
+}

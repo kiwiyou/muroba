@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use muroba::query::{Query, QueryBuilder};
 
 fn main() {
@@ -19,6 +21,7 @@ fn main() {
             if input.is_empty() {
                 LANGUAGES.into_iter().collect()
             } else {
+                std::thread::sleep(Duration::from_millis(500));
                 LANGUAGES
                     .into_iter()
                     .filter(|lang| lang.starts_with(&input))
@@ -26,6 +29,8 @@ fn main() {
             }
         })
         .fix_rows(5)
+        .debounce(Duration::from_secs(1))
+        .wait_message("Filtering...")
         .show()
         .unwrap();
     if let Some(choice) = choice {
