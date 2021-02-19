@@ -1,46 +1,40 @@
-use muroba::{
-    style::{DefaultStyle, Style},
-    Interactive, Promptable,
-};
+use std::time::Duration;
+
+use muroba::query::{Query, QueryBuilder};
 
 fn main() {
-    let choice = DefaultStyle::dynamic_select(|input| {
-        input.split_ascii_whitespace().map(str::to_string).collect()
-    })
-    .with_placeholder("something containing spaces...")
-    .with_prompt("Choose a word within what you typed")
-    .interact()
-    .unwrap();
+    let choice = QueryBuilder::default()
+        .with_prompt("Choose a word within what you typed")
+        .dyn_select(|input: String| input.split_ascii_whitespace().map(str::to_string).collect())
+        .show()
+        .unwrap();
     if let Some(choice) = choice {
         println!("You selected {}!", choice);
     } else {
-        println!("You did not select anything.");
+        println!("Please select a word...");
+        return;
     }
 
-    let selected = DefaultStyle::dynamic_select(|input| {
-        if input.is_empty() {
-            LANGUAGES.iter().copied().map(str::to_string).collect()
-        } else {
-            LANGUAGES
-                .iter()
-                .flat_map(|lang| {
-                    if lang.starts_with(&input) {
-                        Some(lang.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        }
-    })
-    .with_height(5)
-    .with_placeholder("programming language...")
-    .with_wait_message("Waiting for response...")
-    .with_prompt("Which language is your favorite?")
-    .interact()
-    .unwrap();
-    if let Some(language) = selected {
-        println!("Your favorite language is {}!", language);
+    let choice = QueryBuilder::default()
+        .with_prompt("Which langauge is your favorite?")
+        .dyn_select(|input: String| {
+            if input.is_empty() {
+                LANGUAGES.into_iter().collect()
+            } else {
+                std::thread::sleep(Duration::from_millis(500));
+                LANGUAGES
+                    .into_iter()
+                    .filter(|lang| lang.starts_with(&input))
+                    .collect()
+            }
+        })
+        .fix_rows(5)
+        .debounce(Duration::from_secs(1))
+        .wait_message("Filtering...")
+        .show()
+        .unwrap();
+    if let Some(choice) = choice {
+        println!("Your favorite langauge is {}!", choice);
     } else {
         println!("You don't like any language... Seriously?");
     }

@@ -1,12 +1,18 @@
-use muroba::{
-    style::{DefaultStyle, Style},
-    Interactive, Promptable,
-};
+use muroba::query::{Query, QueryBuilder};
 
 fn main() {
-    let name = DefaultStyle::input()
-        .with_prompt("Hello! What's your name?")
-        .interact()
+    let confirm_show = QueryBuilder::default()
+        .with_prompt("May I ask you a question?")
+        .confirm(Some(true))
+        .show()
         .unwrap();
-    println!("Hello {}!", name);
+
+    if confirm_show {
+        let name = QueryBuilder::default()
+            .with_prompt("Hello! What's your name?")
+            .input()
+            .show()
+            .unwrap();
+        println!("Hello {}!", name);
+    }
 }

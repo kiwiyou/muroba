@@ -1,77 +1,108 @@
 use std::io::Write;
 
 use crossterm::{
-    queue,
-    style::{Color, Colorize, Print, PrintStyledContent, ResetColor, SetForegroundColor, Styler},
-    Result,
+    execute, queue,
+    style::{
+        Attribute, Color, Colorize, Print, PrintStyledContent, ResetColor, SetAttribute,
+        SetForegroundColor, Styler as TermStyler,
+    },
 };
 
-use crate::{DynamicSelect, Input, Select};
-
-pub trait Style: Sized {
-    fn print_prompt(f: &mut impl Write, prompt: &str) -> Result<()>;
-
-    fn print_indicator(f: &mut impl Write) -> Result<()>;
-
-    fn format_input(f: &mut impl Write) -> Result<()>;
-
-    fn unformat_input(f: &mut impl Write) -> Result<()> {
-        queue!(f, ResetColor)
-    }
-
-    fn print_list_item(f: &mut impl Write, item: &str, current: bool) -> Result<()>;
-
-    fn print_placeholder(f: &mut impl Write, placeholder: &str) -> Result<()>;
-
-    fn input() -> Input<Self> {
-        Input::new()
-    }
-
-    fn select<T: AsRef<str>>(choices: &[T]) -> Select<Self, T> {
-        Select::new(choices)
-    }
-
-    fn dynamic_select<
-        T: AsRef<str> + Send + 'static,
-        F: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
-    >(
-        generator: F,
-    ) -> DynamicSelect<Self, T, F> {
-        DynamicSelect::new(generator)
-    }
-}
+use crate::{item::*, Result};
 
 pub struct DefaultStyle;
 
-impl Style for DefaultStyle {
-    fn print_prompt(f: &mut impl Write, prompt: &str) -> Result<()> {
+pub trait Styler<I> {
+    fn style(&self, f: &mut impl Write, item: &I) -> Result<()>;
+}
+
+impl Styler<Prompt> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, Prompt(prompt): &Prompt) -> Result<()> {
         queue!(
             f,
-            PrintStyledContent("? ".green()),
-            PrintStyledContent(prompt.bold()),
-            Print(" "),
-            ResetColor
+            PrintStyledContent("?".green()),
+            Print(' '),
+            PrintStyledContent(prompt.as_str().bold()),
+            ResetColor,
         )
     }
+}
 
-    fn print_indicator(f: &mut impl Write) -> Result<()> {
-        queue!(f, PrintStyledContent("> ".dark_grey()), ResetColor)
+impl Styler<BeginInput> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, _: &BeginInput) -> Result<()> {
+        execute!(
+            f,
+            PrintStyledContent(" > ".dark_grey()),
+            SetForegroundColor(Color::Blue),
+        )
     }
+}
 
-    fn format_input(f: &mut impl Write) -> Result<()> {
-        queue!(f, SetForegroundColor(Color::Blue),)
+impl Styler<EndInput> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, _: &EndInput) -> Result<()> {
+        queue!(f, ResetColor,)
     }
+}
 
-    fn print_list_item(f: &mut impl Write, item: &str, current: bool) -> Result<()> {
-        if current {
+impl Styler<ConfirmChoice> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, ConfirmChoice(default): &ConfirmChoice) -> Result<()> {
+        match default {
+            None => {
+                queue!(f, Print(" [y/n]"))
+            }
+            Some(true) => {
+                queue!(
+                    f,
+                    Print(" ["),
+                    PrintStyledContent("Y".underlined()),
+                    ResetColor,
+                    Print("/n]")
+                )
+            }
+            Some(false) => {
+                queue!(
+                    f,
+                    Print(" [y/"),
+                    PrintStyledContent("N".underlined()),
+                    ResetColor,
+                    Print("]")
+                )
+            }
+        }
+    }
+}
+
+impl Styler<ListItem> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, list_item: &ListItem) -> Result<()> {
+        if list_item.is_cursor {
             queue!(f, SetForegroundColor(Color::Blue), Print("> "),)?;
+            if list_item.is_selected {
+                queue!(f, SetAttribute(Attribute::Bold))?;
+            }
+        } else if list_item.is_selected {
+            queue!(f, SetForegroundColor(Color::Green), Print("✓ "),)?;
         } else {
             queue!(f, Print("  "),)?;
         }
-        queue!(f, Print(item), ResetColor,)
-    }
 
-    fn print_placeholder(f: &mut impl Write, placeholder: &str) -> Result<()> {
-        queue!(f, PrintStyledContent(placeholder.grey()), ResetColor)
+        queue!(
+            f,
+            Print(&list_item.item),
+            ResetColor,
+            SetAttribute(Attribute::Reset)
+        )?;
+
+        Ok(())
+    }
+}
+
+impl Styler<WaitMessage> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, WaitMessage(message): &WaitMessage) -> Result<()> {
+        queue!(
+            f,
+            PrintStyledContent(message.as_str().dark_grey().italic()),
+            ResetColor,
+            SetAttribute(Attribute::Reset)
+        )
     }
 }
