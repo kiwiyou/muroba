@@ -7,7 +7,7 @@ use std::{
 };
 
 use crossterm::{
-    cursor::{self, Hide, MoveToColumn, MoveToPreviousLine},
+    cursor::{self, Hide, MoveToPreviousLine},
     event::{self, Event, KeyCode},
     queue,
     style::Print,
