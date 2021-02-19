@@ -1,10 +1,10 @@
-use std::{fmt::Display, io::Write};
+use std::io::Write;
 
 use crossterm::{
     execute, queue,
     style::{
-        Color, Colorize, Print, PrintStyledContent, ResetColor, SetForegroundColor,
-        Styler as TermStyler,
+        Attribute, Color, Colorize, Print, PrintStyledContent, ResetColor, SetAttribute,
+        SetForegroundColor, Styler as TermStyler,
     },
 };
 
@@ -13,23 +13,23 @@ use crate::{item::*, Result};
 pub struct DefaultStyle;
 
 pub trait Styler<I> {
-    fn style(&self, f: &mut impl Write, item: I) -> Result<()>;
+    fn style(&self, f: &mut impl Write, item: &I) -> Result<()>;
 }
 
 impl Styler<Prompt> for DefaultStyle {
-    fn style(&self, f: &mut impl Write, Prompt(prompt): Prompt) -> Result<()> {
+    fn style(&self, f: &mut impl Write, Prompt(prompt): &Prompt) -> Result<()> {
         queue!(
             f,
             PrintStyledContent("?".green()),
             Print(' '),
-            PrintStyledContent(prompt.bold()),
+            PrintStyledContent(prompt.as_str().bold()),
             ResetColor,
         )
     }
 }
 
 impl Styler<BeginInput> for DefaultStyle {
-    fn style(&self, f: &mut impl Write, _: BeginInput) -> Result<()> {
+    fn style(&self, f: &mut impl Write, _: &BeginInput) -> Result<()> {
         execute!(
             f,
             PrintStyledContent(" > ".dark_grey()),
@@ -39,13 +39,13 @@ impl Styler<BeginInput> for DefaultStyle {
 }
 
 impl Styler<EndInput> for DefaultStyle {
-    fn style(&self, f: &mut impl Write, _: EndInput) -> Result<()> {
+    fn style(&self, f: &mut impl Write, _: &EndInput) -> Result<()> {
         queue!(f, ResetColor,)
     }
 }
 
 impl Styler<ConfirmChoice> for DefaultStyle {
-    fn style(&self, f: &mut impl Write, ConfirmChoice(default): ConfirmChoice) -> Result<()> {
+    fn style(&self, f: &mut impl Write, ConfirmChoice(default): &ConfirmChoice) -> Result<()> {
         match default {
             None => {
                 queue!(f, Print(" [y/n]"))
@@ -72,20 +72,25 @@ impl Styler<ConfirmChoice> for DefaultStyle {
     }
 }
 
-impl<'a, T> Styler<ListItem<'a, T>> for DefaultStyle
-where
-    T: Display,
-{
-    fn style(&self, f: &mut impl Write, list_item: ListItem<'a, T>) -> Result<()> {
+impl Styler<ListItem> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, list_item: &ListItem) -> Result<()> {
         if list_item.is_cursor {
             queue!(f, SetForegroundColor(Color::Blue), Print("> "),)?;
+            if list_item.is_selected {
+                queue!(f, SetAttribute(Attribute::Bold))?;
+            }
         } else if list_item.is_selected {
             queue!(f, SetForegroundColor(Color::Green), Print("✓ "),)?;
         } else {
             queue!(f, Print("  "),)?;
         }
 
-        queue!(f, Print(list_item.item), ResetColor,)?;
+        queue!(
+            f,
+            Print(&list_item.item),
+            ResetColor,
+            SetAttribute(Attribute::Reset)
+        )?;
 
         Ok(())
     }

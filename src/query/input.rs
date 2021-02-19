@@ -29,11 +29,11 @@ where
     fn show_on(self, f: &mut impl Write) -> Result<Self::Result> {
         let Self { prompt, style } = self;
 
-        style.style(f, prompt)?;
-        style.style(f, BeginInput)?;
+        style.style(f, &prompt)?;
+        style.style(f, &BeginInput)?;
         let mut input = String::new();
         stdin().read_line(&mut input)?;
-        style.style(f, EndInput)?;
+        style.style(f, &EndInput)?;
 
         input.truncate(input.trim_end_matches(['\n', '\r'].as_ref()).len());
         Ok(input)
@@ -74,9 +74,9 @@ where
             default,
         } = self;
 
-        style.style(f, prompt)?;
-        style.style(f, ConfirmChoice(default))?;
-        style.style(f, BeginInput)?;
+        style.style(f, &prompt)?;
+        style.style(f, &ConfirmChoice(default))?;
+        style.style(f, &BeginInput)?;
 
         enable_raw_mode()?;
         let is_yes = loop {
@@ -104,7 +104,7 @@ where
             }
         };
 
-        style.style(f, EndInput)?;
+        style.style(f, &EndInput)?;
 
         Ok(is_yes)
     }

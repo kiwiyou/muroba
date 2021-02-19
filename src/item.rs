@@ -24,9 +24,9 @@ pub struct EndInput;
 pub struct ConfirmChoice(pub Option<bool>);
 
 /// Represents an element in a list, which is used by select-like queries.
-pub struct ListItem<'a, T> {
+pub struct ListItem {
     /// The item to be shown.
-    pub item: &'a T,
+    pub item: String,
     /// `true` if the selection cursor is on the item.
     pub is_cursor: bool,
     /// `true` if the item is selected.

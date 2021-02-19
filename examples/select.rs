@@ -10,10 +10,10 @@ fn main() {
         .unwrap();
     match selected.len() {
         0 => println!("You don't like fruit?"),
-        1 => println!("Your favorite fruit is {}!", choices[selected[0]]),
+        1 => println!("Your favorite fruit is {}!", selected[0].1),
         _ => println!(
             "Your favorite fruits are {}!",
-            join_string(selected.iter().map(|i| choices[*i]))
+            join_string(selected.iter().map(|(_, choice)| choice.as_str()))
         ),
     }
 
@@ -23,7 +23,7 @@ fn main() {
         .fix_rows(5)
         .show()
         .unwrap();
-    println!("Your favorite language is {}!", LANGUAGES[selected[0]]);
+    println!("Your favorite language is {}!", selected[0].1);
 }
 
 const LANGUAGES: &[&str] = &[

@@ -9,7 +9,7 @@ use crossterm::{
 
 use crate::{item::ListItem, style::Styler, Result};
 
-pub trait SelectHandler<'a, T> {
+pub trait SelectHandler {
     type Result;
 
     fn show(&mut self, f: &mut impl Write) -> Result<()>;
@@ -20,53 +20,50 @@ pub trait SelectHandler<'a, T> {
     fn on_key(&mut self, key_event: KeyEvent) -> bool;
     /// Toggles selection state of current cursor item.
     fn toggle(&mut self);
-    fn get_selected(self) -> Self::Result;
+    fn get_result(self) -> Self::Result;
 }
 
-pub struct ListHandler<'a, S, T> {
+pub struct ListHandler<'a, S> {
     style: &'a S,
-    list: &'a [T],
+    list: Vec<ListItem>,
     cursor: usize,
-    is_selected: Vec<bool>,
     last_printed_rows: u16,
 }
 
-impl<'a, S, T> ListHandler<'a, S, T>
-where
-    S: Styler<ListItem<'a, T>>,
-    T: Display,
-{
-    pub fn new(style: &'a S, list: &'a [T]) -> Self {
+impl<'a, S> ListHandler<'a, S> {
+    pub fn new(style: &'a S, list: &[impl Display]) -> Self {
+        let mut list: Vec<_> = list
+            .iter()
+            .map(|item| ListItem {
+                item: item.to_string(),
+                is_cursor: false,
+                is_selected: false,
+            })
+            .collect();
+        if let Some(first) = list.get_mut(0) {
+            first.is_cursor = true;
+        }
         Self {
             style,
             list,
             cursor: 0,
-            is_selected: vec![false; list.len()],
             last_printed_rows: 0,
         }
     }
 }
 
-impl<'a, S, T> SelectHandler<'a, T> for ListHandler<'a, S, T>
+impl<'a, S> SelectHandler for ListHandler<'a, S>
 where
-    S: Styler<ListItem<'a, T>>,
-    T: Display,
+    S: Styler<ListItem>,
 {
-    /// Returns a list of the index of the selected item.
-    type Result = Vec<usize>;
+    /// Returns a list of the index of the selected item and the value.
+    type Result = Vec<(usize, String)>;
 
     fn show(&mut self, f: &mut impl Write) -> Result<()> {
         let mut printed_rows = 0;
 
-        for (i, item) in self.list.iter().enumerate() {
-            self.style.style(
-                f,
-                ListItem {
-                    item,
-                    is_cursor: i == self.cursor,
-                    is_selected: self.is_selected[i],
-                },
-            )?;
+        for item in self.list.iter() {
+            self.style.style(f, item)?;
             writeln!(f)?;
             printed_rows += 1;
         }
@@ -76,23 +73,29 @@ where
     }
 
     fn clear(&mut self, f: &mut impl Write) -> Result<()> {
-        queue!(
-            f,
-            MoveToPreviousLine(self.last_printed_rows),
-            Clear(ClearType::FromCursorDown),
-        )?;
-        self.last_printed_rows = 0;
+        if self.last_printed_rows > 0 {
+            queue!(
+                f,
+                MoveToPreviousLine(self.last_printed_rows),
+                Clear(ClearType::FromCursorDown),
+            )?;
+            self.last_printed_rows = 0;
+        }
         Ok(())
     }
 
     fn on_key(&mut self, key_event: KeyEvent) -> bool {
         match key_event.code {
             KeyCode::Up if self.cursor > 0 => {
+                self.list[self.cursor].is_cursor = false;
                 self.cursor -= 1;
+                self.list[self.cursor].is_cursor = true;
                 true
             }
             KeyCode::Down if self.cursor + 1 < self.list.len() => {
+                self.list[self.cursor].is_cursor = false;
                 self.cursor += 1;
+                self.list[self.cursor].is_cursor = true;
                 true
             }
             _ => false,
@@ -100,51 +103,68 @@ where
     }
 
     fn toggle(&mut self) {
-        self.is_selected[self.cursor] = !self.is_selected[self.cursor];
+        if !self.list.is_empty() {
+            let is_selected = &mut self.list[self.cursor].is_selected;
+            *is_selected = !*is_selected;
+        }
     }
 
-    fn get_selected(self) -> Self::Result {
-        self.is_selected
-            .iter()
+    fn get_result(self) -> Self::Result {
+        self.list
+            .into_iter()
             .enumerate()
-            .filter_map(|(i, selected)| selected.then(|| i))
+            .filter_map(|(i, item)| item.is_selected.then(|| (i, item.item)))
             .collect()
     }
 }
 
-pub struct FixedRowHandler<'a, S, T> {
+pub struct FixedRowHandler<'a, S> {
     style: &'a S,
-    list: &'a [T],
+    list: Vec<ListItem>,
     cursor: usize,
     rows: usize,
-    is_selected: Vec<bool>,
     last_printed_rows: u16,
 }
 
-impl<'a, S, T> FixedRowHandler<'a, S, T>
-where
-    S: Styler<ListItem<'a, T>>,
-    T: Display,
-{
-    pub fn new(style: &'a S, list: &'a [T], rows: usize) -> Self {
+impl<'a, S> FixedRowHandler<'a, S> {
+    pub fn new(style: &'a S, list: &[impl Display], rows: usize) -> Self {
+        let mut list: Vec<_> = list
+            .iter()
+            .map(|item| ListItem {
+                item: item.to_string(),
+                is_cursor: false,
+                is_selected: false,
+            })
+            .collect();
+        if let Some(first) = list.get_mut(0) {
+            first.is_cursor = true;
+        }
         Self {
             style,
             list,
             cursor: 0,
             rows,
-            is_selected: vec![false; list.len()],
             last_printed_rows: 0,
+        }
+    }
+
+    pub fn from_list_handler(list_handler: ListHandler<'a, S>, rows: usize) -> Self {
+        Self {
+            style: list_handler.style,
+            list: list_handler.list,
+            cursor: list_handler.cursor,
+            rows,
+            last_printed_rows: list_handler.last_printed_rows,
         }
     }
 }
 
-impl<'a, S, T> SelectHandler<'a, T> for FixedRowHandler<'a, S, T>
+impl<'a, S> SelectHandler for FixedRowHandler<'a, S>
 where
-    S: Styler<ListItem<'a, T>>,
-    T: Display,
+    S: Styler<ListItem>,
 {
-    /// Returns the index of the selected item.
-    type Result = Vec<usize>;
+    /// Returns a list of the index of the selected item and the value.
+    type Result = Vec<(usize, String)>;
 
     fn show(&mut self, f: &mut impl Write) -> Result<()> {
         let mut printed_rows = 0;
@@ -159,22 +179,11 @@ where
             self.cursor
         };
 
-        let iter = self
-            .list
-            .iter()
-            .enumerate()
-            .cycle()
-            .skip(start)
-            .take(self.rows);
-        for (i, item) in iter {
-            self.style.style(
-                f,
-                ListItem {
-                    item,
-                    is_cursor: i == self.cursor,
-                    is_selected: false,
-                },
-            )?;
+        let count = std::cmp::min(self.list.len(), self.rows);
+
+        let iter = self.list.iter().cycle().skip(start).take(count);
+        for item in iter {
+            self.style.style(f, item)?;
             writeln!(f)?;
             printed_rows += 1;
         }
@@ -184,12 +193,14 @@ where
     }
 
     fn clear(&mut self, f: &mut impl Write) -> Result<()> {
-        queue!(
-            f,
-            MoveToPreviousLine(self.last_printed_rows),
-            Clear(ClearType::FromCursorDown),
-        )?;
-        self.last_printed_rows = 0;
+        if self.last_printed_rows > 0 {
+            queue!(
+                f,
+                MoveToPreviousLine(self.last_printed_rows),
+                Clear(ClearType::FromCursorDown),
+            )?;
+            self.last_printed_rows = 0;
+        }
         Ok(())
     }
 
@@ -198,29 +209,37 @@ where
             KeyCode::Up => {
                 if self.rows > self.list.len() {
                     if self.cursor > 0 {
+                        self.list[self.cursor].is_cursor = false;
                         self.cursor -= 1;
+                        self.list[self.cursor].is_cursor = true;
                         true
                     } else {
                         false
                     }
                 } else {
+                    self.list[self.cursor].is_cursor = false;
                     self.cursor += self.list.len();
                     self.cursor -= 1;
                     self.cursor %= self.list.len();
+                    self.list[self.cursor].is_cursor = true;
                     true
                 }
             }
             KeyCode::Down => {
                 if self.rows > self.list.len() {
                     if self.cursor + 1 < self.list.len() {
+                        self.list[self.cursor].is_cursor = false;
                         self.cursor += 1;
+                        self.list[self.cursor].is_cursor = true;
                         true
                     } else {
                         false
                     }
                 } else {
+                    self.list[self.cursor].is_cursor = false;
                     self.cursor += 1;
                     self.cursor %= self.list.len();
+                    self.list[self.cursor].is_cursor = true;
                     true
                 }
             }
@@ -229,14 +248,17 @@ where
     }
 
     fn toggle(&mut self) {
-        self.is_selected[self.cursor] = !self.is_selected[self.cursor];
+        if !self.list.is_empty() {
+            let is_selected = &mut self.list[self.cursor].is_selected;
+            *is_selected = !*is_selected;
+        }
     }
 
-    fn get_selected(self) -> Self::Result {
-        self.is_selected
-            .iter()
+    fn get_result(self) -> Self::Result {
+        self.list
+            .into_iter()
             .enumerate()
-            .filter_map(|(i, selected)| selected.then(|| i))
+            .filter_map(|(i, item)| item.is_selected.then(|| (i, item.item)))
             .collect()
     }
 }

@@ -1,10 +1,6 @@
 use std::{
-    fmt::Display,
     io::Write,
-    sync::{
-        mpsc::{channel, sync_channel},
-        Arc,
-    },
+    sync::{mpsc::sync_channel, Arc},
     thread,
     time::{Duration, Instant},
     writeln,
@@ -15,7 +11,7 @@ use crossterm::{
     event::{self, Event, KeyCode},
     queue,
     style::Print,
-    terminal::{disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
 use cursor::Show;
 
@@ -26,32 +22,20 @@ use crate::{
     Result,
 };
 
-use super::{FixedRowHandler, SelectHandler};
+use super::{FixedRowHandler, ListHandler, SelectHandler};
 
-pub struct SelectQuery<'a, S, T, H>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<ListItem<'a, T>>,
-    T: Display,
-    H: SelectHandler<'a, T>,
-{
-    pub(crate) prompt: Prompt,
-    pub(crate) style: &'a S,
-    pub(crate) list: &'a [T],
-    pub(crate) handler: H,
-    pub(crate) is_many: bool,
+pub struct SelectQuery<'a, S, H> {
+    prompt: Prompt,
+    style: &'a S,
+    handler: H,
+    is_many: bool,
 }
 
-impl<'a, S, T, H> SelectQuery<'a, S, T, H>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<ListItem<'a, T>>,
-    T: Display,
-    H: SelectHandler<'a, T>,
-{
-    pub fn new(prompt: Prompt, style: &'a S, list: &'a [T], handler: H) -> Self {
+impl<'a, S, H> SelectQuery<'a, S, H> {
+    pub fn new(prompt: Prompt, style: &'a S, handler: H) -> Self {
         Self {
             prompt,
             style,
-            list,
             handler,
             is_many: false,
         }
@@ -63,40 +47,38 @@ where
             ..self
         }
     }
+}
 
-    pub fn fix_rows(self, rows: usize) -> SelectQuery<'a, S, T, FixedRowHandler<'a, S, T>> {
+impl<'a, S> SelectQuery<'a, S, ListHandler<'a, S>> {
+    pub fn fix_rows(self, rows: usize) -> SelectQuery<'a, S, FixedRowHandler<'a, S>> {
         assert!(rows > 0);
         SelectQuery {
             prompt: self.prompt,
             style: self.style,
-            list: self.list,
-            handler: FixedRowHandler::new(self.style, self.list, rows),
+            handler: FixedRowHandler::from_list_handler(self.handler, rows),
             is_many: self.is_many,
         }
     }
 }
 
-impl<'a, S, T, H> Query for SelectQuery<'a, S, T, H>
+impl<'a, S, H> Query for SelectQuery<'a, S, H>
 where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<ListItem<'a, T>>,
-    T: Display,
-    H: SelectHandler<'a, T, Result = Vec<usize>>,
+    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<ListItem>,
+    H: SelectHandler<Result = Vec<(usize, String)>>,
 {
-    type Result = Vec<usize>;
+    type Result = Vec<(usize, String)>;
 
     fn show_on(self, f: &mut impl Write) -> Result<Self::Result> {
         let Self {
             prompt,
             style,
-            list,
             mut handler,
             is_many,
         } = self;
 
         queue!(f, Hide)?;
 
-        style.style(f, prompt)?;
-        let (input_x, _) = cursor::position()?;
+        style.style(f, &prompt)?;
         writeln!(f)?;
 
         handler.show(f)?;
@@ -110,7 +92,7 @@ where
                         if !is_many {
                             handler.toggle();
                         }
-                        break handler.get_selected();
+                        break handler.get_result();
                     }
                     KeyCode::Char(' ') if is_many => {
                         handler.toggle();
@@ -133,10 +115,11 @@ where
         assert!(is_many || result.len() == 1);
 
         if !is_many {
-            queue!(f, MoveToPreviousLine(1), MoveToColumn(input_x),)?;
-            style.style(f, BeginInput)?;
-            queue!(f, Print(&list[result[0]]))?;
-            style.style(f, EndInput)?;
+            queue!(f, MoveToPreviousLine(1))?;
+            style.style(f, &prompt)?;
+            style.style(f, &BeginInput)?;
+            queue!(f, Print(&result[0].1))?;
+            style.style(f, &EndInput)?;
             writeln!(f)?;
         }
 
@@ -164,15 +147,35 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
     }
 }
 
+impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> {
+    pub fn fix_rows<'b, T>(
+        self,
+        rows: usize,
+    ) -> DynamicSelectQuery<'a, S, ListGen, Box<dyn FnMut(&[T]) -> FixedRowHandler<'a, S> + 'b>>
+    where
+        HandlerGen: FnMut(&[T]) -> ListHandler<'a, S> + 'b,
+    {
+        let mut handler_gen = self.handler_gen;
+        DynamicSelectQuery {
+            prompt: self.prompt,
+            style: self.style,
+            list_gen: self.list_gen,
+            handler_gen: Box::new(move |list| {
+                FixedRowHandler::from_list_handler(handler_gen(list), rows)
+            }),
+        }
+    }
+}
+
 impl<'a, S, T, H, ListGen, HandlerGen> Query for DynamicSelectQuery<'a, S, ListGen, HandlerGen>
 where
     S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-    T: Display + Send + 'static,
-    H: SelectHandler<'a, T, Result = Vec<usize>>,
+    H: SelectHandler<Result = Vec<(usize, String)>> + 'a,
+    T: Send + 'static,
     ListGen: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
-    HandlerGen: FnMut(&[T]) -> H,
+    HandlerGen: FnMut(&[T]) -> H + 'a,
 {
-    type Result = usize;
+    type Result = Option<String>;
 
     fn show_on(self, f: &mut impl Write) -> Result<Self::Result> {
         let Self {
@@ -185,9 +188,9 @@ where
 
         queue!(f, Hide)?;
 
-        style.style(f, prompt)?;
-        let (input_x, _) = cursor::position()?;
-        style.style(f, BeginInput)?;
+        style.style(f, &prompt)?;
+        style.style(f, &BeginInput)?;
+        style.style(f, &EndInput)?;
         writeln!(f)?;
         let (tx, rx) = sync_channel::<Vec<T>>(1);
         let spawn_list_gen = |input: String| {
@@ -200,33 +203,41 @@ where
         };
 
         let mut input = String::new();
-        spawn_list_gen(input.clone());
-
         let mut handler: Option<H> = None;
-        let mut list;
 
-        const POLL_DURATION: Duration = Duration::from_millis(100);
+        const POLL_DURATION: Duration = Duration::from_millis(10);
         const DEBOUNCE_DURATION: Duration = Duration::from_secs(1);
-        let mut debounce_until = None;
-        let result = loop {
+        let mut debounce_until = Some(Instant::now());
+        let mut result = loop {
             if let Ok(new_list) = rx.try_recv() {
+                disable_raw_mode()?;
                 if let Some(mut handler) = handler {
                     handler.clear(f)?;
                 }
-                list = new_list;
-                handler = Some(handler_gen(&list));
+                queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+                style.style(f, &prompt)?;
+                style.style(f, &BeginInput)?;
+                queue!(f, Print(&input))?;
+                style.style(f, &EndInput)?;
+                writeln!(f)?;
+                let mut tmp_handler = handler_gen(&new_list);
+                tmp_handler.show(f)?;
+                handler = Some(tmp_handler);
+                enable_raw_mode()?;
             }
             if matches!(debounce_until, Some(until) if until < Instant::now()) {
+                debounce_until = None;
                 disable_raw_mode()?;
                 if let Some(mut handler) = handler {
                     handler.clear(f)?;
                 }
                 spawn_list_gen(input.clone());
                 handler = None;
-                queue!(f, MoveToPreviousLine(1), MoveToColumn(input_x))?;
-                style.style(f, BeginInput)?;
+                queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+                style.style(f, &prompt)?;
+                style.style(f, &BeginInput)?;
                 queue!(f, Print(&input))?;
-                style.style(f, EndInput)?;
+                style.style(f, &EndInput)?;
                 writeln!(f)?;
                 enable_raw_mode()?;
             }
@@ -252,7 +263,7 @@ where
                                 handler.toggle();
                                 disable_raw_mode()?;
                                 handler.clear(f)?;
-                                break handler.get_selected();
+                                break handler.get_result();
                             } else {
                                 false
                             }
@@ -264,30 +275,35 @@ where
                         if let Some(handler) = &mut handler {
                             handler.clear(f)?;
                         }
-                        queue!(f, MoveToPreviousLine(1), MoveToColumn(input_x))?;
-                        style.style(f, BeginInput)?;
+                        queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+                        style.style(f, &prompt)?;
+                        style.style(f, &BeginInput)?;
                         queue!(f, Print(&input))?;
-                        style.style(f, EndInput)?;
+                        style.style(f, &EndInput)?;
+                        writeln!(f)?;
                         if let Some(handler) = &mut handler {
                             handler.show(f)?;
                         }
-                        writeln!(f)?;
                         enable_raw_mode()?;
                     }
                 }
             }
         };
         disable_raw_mode()?;
-        assert_eq!(1, result.len());
+        assert!(result.len() <= 1);
 
-        queue!(f, MoveToPreviousLine(1), MoveToColumn(input_x))?;
-        style.style(f, BeginInput)?;
-        queue!(f, Print(&result[0]))?;
-        style.style(f, EndInput)?;
+        queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+        style.style(f, &prompt)?;
+        style.style(f, &BeginInput)?;
+        let result = (!result.is_empty()).then(|| result.remove(0).1);
+        if let Some(item) = &result {
+            queue!(f, Print(&item))?;
+        }
+        style.style(f, &EndInput)?;
         writeln!(f)?;
 
         queue!(f, Show)?;
 
-        Ok(result[0])
+        Ok(result)
     }
 }
