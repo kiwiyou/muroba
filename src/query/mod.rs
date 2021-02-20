@@ -5,6 +5,7 @@ use crate::style::{DefaultStyle, Styler};
 use crate::Result;
 
 mod input;
+mod reader;
 mod select;
 
 pub use input::*;

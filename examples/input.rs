@@ -14,5 +14,13 @@ fn main() {
             .show()
             .unwrap();
         println!("Hello {}!", name);
+
+        let secret = QueryBuilder::default()
+            .with_prompt("Say something secret!")
+            .secret()
+            .with_replace_char('*')
+            .show()
+            .unwrap();
+        println!("Your secret is '{}.'", secret);
     }
 }

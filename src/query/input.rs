@@ -1,42 +1,68 @@
 use std::io::{stdin, Write};
 
 use crossterm::{
+    cursor,
     event::{self, Event},
-    terminal::{disable_raw_mode, enable_raw_mode},
+    queue,
+    style::Print,
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
+use cursor::MoveToColumn;
 use event::KeyCode;
 
 use crate::item::{BeginInput, ConfirmChoice, EndInput, Prompt};
 use crate::style::Styler;
 use crate::Result;
 
-use super::{Query, QueryBuilder};
+use super::{
+    reader::{CharacterShield, EmptyShield, SecretReader, PlainReader, TextReader},
+    Query, QueryBuilder,
+};
 
-pub struct InputQuery<'a, S>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-{
+pub struct InputQuery<'a, S, R> {
     prompt: Prompt,
     style: &'a S,
+    reader: R,
 }
 
-impl<'a, S> Query for InputQuery<'a, S>
+impl<'a, S, R> Query for InputQuery<'a, S, R>
 where
     S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
+    R: TextReader,
 {
     type Result = String;
 
     fn show_on(self, f: &mut impl Write) -> Result<Self::Result> {
-        let Self { prompt, style } = self;
+        let Self {
+            prompt,
+            style,
+            mut reader,
+        } = self;
 
         style.style(f, &prompt)?;
+        let (x, _) = cursor::position()?;
         style.style(f, &BeginInput)?;
-        let mut input = String::new();
-        stdin().read_line(&mut input)?;
+        enable_raw_mode()?;
+        let result = loop {
+            if let Event::Key(event) = event::read()? {
+                let redraw = match event.code {
+                    KeyCode::Enter => break reader.get_result(),
+                    _ => reader.on_key(&event),
+                };
+                if redraw {
+                    disable_raw_mode()?;
+                    queue!(f, MoveToColumn(x + 1))?;
+                    style.style(f, &BeginInput)?;
+                    queue!(f, Print(reader.text()), Clear(ClearType::UntilNewLine))?;
+                    enable_raw_mode()?;
+                }
+            }
+        };
+        disable_raw_mode()?;
         style.style(f, &EndInput)?;
+        writeln!(f)?;
 
-        input.truncate(input.trim_end_matches(['\n', '\r'].as_ref()).len());
-        Ok(input)
+        Ok(result)
     }
 }
 
@@ -44,10 +70,29 @@ impl<'a, S> QueryBuilder<'a, S>
 where
     S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
 {
-    pub fn input(self) -> InputQuery<'a, S> {
+    pub fn input(self) -> InputQuery<'a, S, PlainReader> {
         InputQuery {
             prompt: Prompt(self.prompt.unwrap_or_default()),
             style: self.style,
+            reader: PlainReader::new(),
+        }
+    }
+
+    pub fn secret(self) -> InputQuery<'a, S, SecretReader<EmptyShield>> {
+        InputQuery {
+            prompt: Prompt(self.prompt.unwrap_or_default()),
+            style: self.style,
+            reader: SecretReader::new(EmptyShield),
+        }
+    }
+}
+
+impl<'a, S> InputQuery<'a, S, SecretReader<EmptyShield>> {
+    pub fn with_replace_char(self, c: char) -> InputQuery<'a, S, SecretReader<CharacterShield>> {
+        InputQuery {
+            prompt: self.prompt,
+            style: self.style,
+            reader: SecretReader::new(CharacterShield::new(c)),
         }
     }
 }
