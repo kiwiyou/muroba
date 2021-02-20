@@ -4,15 +4,17 @@ use crossterm::{
     cursor,
     event::{self, Event},
     queue,
-    style::Print,
     terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
 use cursor::MoveToColumn;
 use event::KeyCode;
 
-use crate::item::{BeginInput, ConfirmChoice, EndInput, Prompt};
 use crate::style::Styler;
 use crate::Result;
+use crate::{
+    item::{BeginInput, ConfirmChoice, EndInput, Overflow, Prompt},
+    util::trim_print,
+};
 
 use super::{
     reader::{CharacterShield, EmptyShield, PlainReader, SecretReader, TextReader},
@@ -27,7 +29,7 @@ pub struct InputQuery<'a, S, R> {
 
 impl<'a, S, R> Query for InputQuery<'a, S, R>
 where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
+    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<Overflow>,
     R: TextReader,
 {
     type Result = String;
@@ -53,7 +55,8 @@ where
                     disable_raw_mode()?;
                     queue!(f, MoveToColumn(x + 1))?;
                     style.style(f, &BeginInput)?;
-                    queue!(f, Print(reader.text()), Clear(ClearType::UntilNewLine))?;
+                    trim_print(style, f, reader.text())?;
+                    queue!(f, Clear(ClearType::UntilNewLine))?;
                     enable_raw_mode()?;
                 }
             }

@@ -9,6 +9,7 @@ mod reader;
 mod select;
 
 pub use input::*;
+pub use reader::*;
 pub use select::*;
 
 pub struct QueryBuilder<'a, S>

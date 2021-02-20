@@ -17,7 +17,7 @@ use cursor::Show;
 
 use crate::{
     item::{BeginInput, EndInput, ListItem, Overflow, Prompt, WaitMessage},
-    query::Query,
+    query::{PlainReader, Query, TextReader},
     style::Styler,
     util, Result,
 };
@@ -99,13 +99,15 @@ where
                         disable_raw_mode()?;
                         handler.rewind(f)?;
                         handler.show(f)?;
+                        f.flush()?;
                         enable_raw_mode()?;
                     }
                     _ => {
-                        if handler.on_key(event) {
+                        if handler.on_key(&event) {
                             disable_raw_mode()?;
                             handler.rewind(f)?;
                             handler.show(f)?;
+                            f.flush()?;
                             enable_raw_mode()?;
                         }
                     }
@@ -124,6 +126,7 @@ where
         }
 
         queue!(f, Clear(ClearType::FromCursorDown), Show)?;
+        f.flush()?;
 
         Ok(result)
     }
@@ -209,6 +212,7 @@ where
             wait_message,
             debounce,
         } = self;
+        let mut reader = PlainReader::default();
         let list_gen = Arc::new(list_gen);
 
         queue!(f, Hide)?;
@@ -227,7 +231,6 @@ where
             });
         };
 
-        let mut input = String::new();
         let mut handler: Option<H> = None;
 
         const POLL_DURATION: Duration = Duration::from_millis(10);
@@ -241,19 +244,20 @@ where
                 queue!(f, MoveToPreviousLine(1))?;
                 style.style(f, &prompt)?;
                 style.style(f, &BeginInput)?;
-                util::trim_print(style, f, &input)?;
+                util::trim_print(style, f, &reader.text())?;
                 style.style(f, &EndInput)?;
                 queue!(f, Clear(ClearType::UntilNewLine))?;
                 writeln!(f)?;
                 let mut tmp_handler = handler_gen(&new_list);
                 tmp_handler.show(f)?;
                 queue!(f, Clear(ClearType::FromCursorDown))?;
+                f.flush()?;
                 enable_raw_mode()?;
                 handler = Some(tmp_handler);
             }
             if matches!(debounce_until, Some(until) if until < Instant::now()) {
                 debounce_until = None;
-                spawn_list_gen(input.clone());
+                spawn_list_gen(reader.text().to_string());
                 disable_raw_mode()?;
                 if let Some(wait_message) = &wait_message {
                     if let Some(mut handler) = handler {
@@ -263,32 +267,19 @@ where
                     queue!(f, MoveToPreviousLine(1))?;
                     style.style(f, &prompt)?;
                     style.style(f, &BeginInput)?;
-                    util::trim_print(style, f, &input)?;
+                    util::trim_print(style, f, &reader.text())?;
                     style.style(f, &EndInput)?;
                     queue!(f, Clear(ClearType::UntilNewLine))?;
                     writeln!(f)?;
                     queue!(f, Clear(ClearType::FromCursorDown))?;
                     style.style(f, wait_message)?;
+                    f.flush()?;
                     enable_raw_mode()?;
                 }
             }
             if event::poll(POLL_DURATION)? {
                 if let Event::Key(event) = event::read()? {
                     let redraw = match event.code {
-                        KeyCode::Char(c) => {
-                            input.push(c);
-                            debounce_until = Some(Instant::now() + debounce);
-                            true
-                        }
-                        KeyCode::Backspace => {
-                            if !input.is_empty() {
-                                input.pop();
-                                debounce_until = Some(Instant::now() + debounce);
-                                true
-                            } else {
-                                false
-                            }
-                        }
                         KeyCode::Enter => {
                             if let Some(mut handler) = handler {
                                 handler.toggle();
@@ -299,7 +290,14 @@ where
                                 false
                             }
                         }
-                        _ => handler.as_mut().map(|h| h.on_key(event)).unwrap_or(false),
+                        _ => {
+                            if reader.on_key(&event) {
+                                debounce_until = Some(Instant::now() + debounce);
+                                true
+                            } else {
+                                handler.as_mut().map(|h| h.on_key(&event)).unwrap_or(false)
+                            }
+                        }
                     };
                     if redraw {
                         disable_raw_mode()?;
@@ -309,7 +307,7 @@ where
                         queue!(f, MoveToPreviousLine(1))?;
                         style.style(f, &prompt)?;
                         style.style(f, &BeginInput)?;
-                        util::trim_print(style, f, &input)?;
+                        util::trim_print(style, f, &reader.text())?;
                         style.style(f, &EndInput)?;
                         queue!(f, Clear(ClearType::UntilNewLine))?;
                         writeln!(f)?;
@@ -320,6 +318,7 @@ where
                             queue!(f, Clear(ClearType::FromCursorDown))?;
                             style.style(f, wait_message)?;
                         }
+                        f.flush()?;
                         enable_raw_mode()?;
                     }
                 }
@@ -336,6 +335,7 @@ where
             util::trim_print(style, f, &item)?;
         }
         style.style(f, &EndInput)?;
+        queue!(f, Clear(ClearType::UntilNewLine))?;
         writeln!(f)?;
 
         queue!(f, Clear(ClearType::FromCursorDown), Show)?;

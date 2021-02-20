@@ -17,7 +17,7 @@ pub trait SelectHandler {
     /// Handles a key event and returns `true` if redraw is required.
     ///
     /// It should only handle movement events, such as Up and Down key.
-    fn on_key(&mut self, key_event: KeyEvent) -> bool;
+    fn on_key(&mut self, key_event: &KeyEvent) -> bool;
     /// Toggles selection state of current cursor item.
     fn toggle(&mut self);
     fn get_result(self) -> Self::Result;
@@ -81,7 +81,7 @@ where
         Ok(())
     }
 
-    fn on_key(&mut self, key_event: KeyEvent) -> bool {
+    fn on_key(&mut self, key_event: &KeyEvent) -> bool {
         match key_event.code {
             KeyCode::Up if self.cursor > 0 => {
                 self.list[self.cursor].is_cursor = false;
@@ -198,7 +198,7 @@ where
         Ok(())
     }
 
-    fn on_key(&mut self, key_event: KeyEvent) -> bool {
+    fn on_key(&mut self, key_event: &KeyEvent) -> bool {
         match key_event.code {
             KeyCode::Up => {
                 if self.rows > self.list.len() {
