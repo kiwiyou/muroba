@@ -1,11 +1,6 @@
 use std::io::Write;
 
-use crossterm::{
-    cursor,
-    event::{self, Event},
-    queue,
-    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
-};
+use crossterm::{cursor::{self, Hide, Show}, event::{self, Event}, queue, terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType}};
 use cursor::MoveToColumn;
 use event::KeyCode;
 
@@ -53,10 +48,11 @@ where
                 };
                 if redraw {
                     disable_raw_mode()?;
-                    queue!(f, MoveToColumn(x + 1))?;
+                    queue!(f, Hide, MoveToColumn(x + 1))?;
                     style.style(f, &BeginInput)?;
                     trim_print(style, f, reader.text())?;
-                    queue!(f, Clear(ClearType::UntilNewLine))?;
+                    queue!(f, Show, Clear(ClearType::UntilNewLine))?;
+                    f.flush()?;
                     enable_raw_mode()?;
                 }
             }
