@@ -10,6 +10,8 @@ use crate::{item::*, style::Styler};
 
 use super::QueryBuilder;
 
+type ListHandlerGen<'a, S, T> = Box<dyn FnMut(&[T]) -> ListHandler<'a, S> + 'a>;
+
 impl<'a, S> QueryBuilder<'a, S>
 where
     S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
@@ -29,7 +31,7 @@ where
     pub fn dyn_select<T, ListGen>(
         self,
         list_gen: ListGen,
-    ) -> DynamicSelectQuery<'a, S, ListGen, Box<dyn FnMut(&[T]) -> ListHandler<'a, S> + 'a>>
+    ) -> DynamicSelectQuery<'a, S, ListGen, ListHandlerGen<'a, S, T>>
     where
         S: Styler<ListItem>,
         T: Display + Send + 'static,

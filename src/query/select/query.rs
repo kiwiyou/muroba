@@ -162,11 +162,13 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
     }
 }
 
+type FixedRowHandlerGen<'a, 'b, S, T> = Box<dyn FnMut(&[T]) -> FixedRowHandler<'a, S> + 'b>;
+
 impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> {
     pub fn fix_rows<'b, T>(
         self,
         rows: usize,
-    ) -> DynamicSelectQuery<'a, S, ListGen, Box<dyn FnMut(&[T]) -> FixedRowHandler<'a, S> + 'b>>
+    ) -> DynamicSelectQuery<'a, S, ListGen, FixedRowHandlerGen<'a, 'b, S, T>>
     where
         HandlerGen: FnMut(&[T]) -> ListHandler<'a, S> + 'b,
     {

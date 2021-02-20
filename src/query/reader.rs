@@ -6,16 +6,9 @@ pub trait TextReader {
     fn get_result(self) -> String;
 }
 
+#[derive(Default)]
 pub struct PlainReader {
     input: String,
-}
-
-impl PlainReader {
-    pub fn new() -> Self {
-        Self {
-            input: String::new(),
-        }
-    }
 }
 
 impl TextReader for PlainReader {

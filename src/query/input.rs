@@ -1,4 +1,4 @@
-use std::io::{stdin, Write};
+use std::io::Write;
 
 use crossterm::{
     cursor,
@@ -15,7 +15,7 @@ use crate::style::Styler;
 use crate::Result;
 
 use super::{
-    reader::{CharacterShield, EmptyShield, SecretReader, PlainReader, TextReader},
+    reader::{CharacterShield, EmptyShield, PlainReader, SecretReader, TextReader},
     Query, QueryBuilder,
 };
 
@@ -74,7 +74,7 @@ where
         InputQuery {
             prompt: Prompt(self.prompt.unwrap_or_default()),
             style: self.style,
-            reader: PlainReader::new(),
+            reader: PlainReader::default(),
         }
     }
 

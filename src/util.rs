@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write};
+use std::io::Write;
 
 use crossterm::{cursor, queue, style::Print, terminal};
 use unicode_width::UnicodeWidthStr;
