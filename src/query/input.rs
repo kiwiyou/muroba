@@ -1,8 +1,9 @@
-use std::io::Write;
+use std::{ffi::OsString, io::{Write, Read}, path::Path, process};
 
 use crossterm::{cursor::{self, Hide, Show}, event::{self, Event}, queue, terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType}};
 use cursor::MoveToColumn;
 use event::KeyCode;
+use process::Command;
 
 use crate::style::Styler;
 use crate::Result;
@@ -96,10 +97,7 @@ impl<'a, S> InputQuery<'a, S, SecretReader<EmptyShield>> {
     }
 }
 
-pub struct ConfirmQuery<'a, S>
-where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput>,
-{
+pub struct ConfirmQuery<'a, S> {
     prompt: Prompt,
     style: &'a S,
     default: Option<bool>,
@@ -164,5 +162,50 @@ where
             style: self.style,
             default,
         }
+    }
+}
+
+#[derive(Default)]
+pub struct EditorQuery {
+    editor: Option<OsString>,
+}
+
+impl EditorQuery {
+    pub fn with_editor<P>(self, path: P) -> Self
+    where
+        P: AsRef<Path>
+    {
+        Self {
+            editor: Some(path.as_ref().as_os_str().to_owned()),
+        }
+    }
+
+    fn editor(self) -> Command {
+        let prog = self.editor.or_else(|| std::env::var_os("VISUAL"))
+        .or_else(|| std::env::var_os("EDITOR"))
+        .unwrap_or(if cfg!(windows) { "notepad.exe" } else { "vi" }.into());
+        Command::new(prog)
+    }
+}
+
+impl Query for EditorQuery {
+    type Result = Option<String>;
+
+    fn show_on(self, _: &mut impl Write) -> Result<Self::Result> {
+        let temp = tempfile::NamedTempFile::new()?;
+
+        if self.editor().arg(temp.path()).spawn()?.wait()?.success() {
+            let mut text = String::new();
+            temp.into_file().read_to_string(&mut text)?;
+            Ok(Some(text))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl<'a, S> QueryBuilder<'a, S> {
+    pub fn editor(self) -> EditorQuery {
+        EditorQuery::default()
     }
 }

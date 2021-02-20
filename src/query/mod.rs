@@ -12,10 +12,7 @@ pub use input::*;
 pub use reader::*;
 pub use select::*;
 
-pub struct QueryBuilder<'a, S>
-where
-    S: Styler<Prompt>,
-{
+pub struct QueryBuilder<'a, S> {
     prompt: Option<String>,
     style: &'a S,
 }

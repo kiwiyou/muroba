@@ -22,5 +22,13 @@ fn main() {
             .show()
             .unwrap();
         println!("Your secret is '{}.'", secret);
+
+        let letter = QueryBuilder::default()
+            .editor()
+            .show()
+            .unwrap();
+        if let Some(letter) = letter {
+            println!("Letter from you: {}", letter.trim());
+        }
     }
 }
