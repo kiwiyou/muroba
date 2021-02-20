@@ -88,7 +88,7 @@ where
                 match event.code {
                     KeyCode::Enter => {
                         disable_raw_mode()?;
-                        handler.clear(f)?;
+                        handler.rewind(f)?;
                         if !is_many {
                             handler.toggle();
                         }
@@ -97,14 +97,14 @@ where
                     KeyCode::Char(' ') if is_many => {
                         handler.toggle();
                         disable_raw_mode()?;
-                        handler.clear(f)?;
+                        handler.rewind(f)?;
                         handler.show(f)?;
                         enable_raw_mode()?;
                     }
                     _ => {
                         if handler.on_key(event) {
                             disable_raw_mode()?;
-                            handler.clear(f)?;
+                            handler.rewind(f)?;
                             handler.show(f)?;
                             enable_raw_mode()?;
                         }
@@ -123,7 +123,7 @@ where
             writeln!(f)?;
         }
 
-        queue!(f, Show)?;
+        queue!(f, Clear(ClearType::FromCursorDown), Show)?;
 
         Ok(result)
     }
@@ -134,7 +134,7 @@ pub struct DynamicSelectQuery<'a, S, ListGen, HandlerGen> {
     style: &'a S,
     list_gen: ListGen,
     handler_gen: HandlerGen,
-    wait_message: WaitMessage,
+    wait_message: Option<WaitMessage>,
     debounce: Duration,
 }
 
@@ -145,14 +145,14 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
             style,
             list_gen,
             handler_gen,
-            wait_message: WaitMessage("".into()),
+            wait_message: None,
             debounce: Duration::new(0, 0),
         }
     }
 
     pub fn wait_message(self, wait_message: impl AsRef<str>) -> Self {
         Self {
-            wait_message: WaitMessage(wait_message.as_ref().into()),
+            wait_message: Some(WaitMessage(wait_message.as_ref().into())),
             ..self
         }
     }
@@ -230,39 +230,41 @@ where
             if let Ok(new_list) = rx.try_recv() {
                 disable_raw_mode()?;
                 if let Some(mut handler) = handler {
-                    handler.clear(f)?;
-                } else {
-                    queue!(f, Clear(ClearType::CurrentLine))?;
+                    handler.rewind(f)?;
                 }
-                queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+                queue!(f, MoveToPreviousLine(1))?;
                 style.style(f, &prompt)?;
                 style.style(f, &BeginInput)?;
                 queue!(f, Print(&input))?;
                 style.style(f, &EndInput)?;
+                queue!(f, Clear(ClearType::UntilNewLine))?;
                 writeln!(f)?;
                 let mut tmp_handler = handler_gen(&new_list);
                 tmp_handler.show(f)?;
-                handler = Some(tmp_handler);
+                queue!(f, Clear(ClearType::FromCursorDown))?;
                 enable_raw_mode()?;
+                handler = Some(tmp_handler);
             }
             if matches!(debounce_until, Some(until) if until < Instant::now()) {
                 debounce_until = None;
-                disable_raw_mode()?;
-                if let Some(mut handler) = handler {
-                    handler.clear(f)?;
-                } else {
-                    queue!(f, Clear(ClearType::CurrentLine))?;
-                }
                 spawn_list_gen(input.clone());
-                handler = None;
-                queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
-                style.style(f, &prompt)?;
-                style.style(f, &BeginInput)?;
-                queue!(f, Print(&input))?;
-                style.style(f, &EndInput)?;
-                writeln!(f)?;
-                style.style(f, &wait_message)?;
-                enable_raw_mode()?;
+                disable_raw_mode()?;
+                if let Some(wait_message) = &wait_message {
+                    if let Some(mut handler) = handler {
+                        handler.rewind(f)?;
+                    }
+                    handler = None;
+                    queue!(f, MoveToPreviousLine(1))?;
+                    style.style(f, &prompt)?;
+                    style.style(f, &BeginInput)?;
+                    queue!(f, Print(&input))?;
+                    style.style(f, &EndInput)?;
+                    queue!(f, Clear(ClearType::UntilNewLine))?;
+                    writeln!(f)?;
+                    queue!(f, Clear(ClearType::FromCursorDown))?;
+                    style.style(f, wait_message)?;
+                    enable_raw_mode()?;
+                }
             }
             if event::poll(POLL_DURATION)? {
                 if let Event::Key(event) = event::read()? {
@@ -285,7 +287,7 @@ where
                             if let Some(mut handler) = handler {
                                 handler.toggle();
                                 disable_raw_mode()?;
-                                handler.clear(f)?;
+                                handler.rewind(f)?;
                                 break handler.get_result();
                             } else {
                                 false
@@ -296,20 +298,21 @@ where
                     if redraw {
                         disable_raw_mode()?;
                         if let Some(handler) = &mut handler {
-                            handler.clear(f)?;
-                        } else {
-                            queue!(f, Clear(ClearType::CurrentLine))?;
+                            handler.rewind(f)?;
                         }
-                        queue!(f, MoveToPreviousLine(1), Clear(ClearType::CurrentLine))?;
+                        queue!(f, MoveToPreviousLine(1))?;
                         style.style(f, &prompt)?;
                         style.style(f, &BeginInput)?;
                         queue!(f, Print(&input))?;
                         style.style(f, &EndInput)?;
+                        queue!(f, Clear(ClearType::UntilNewLine))?;
                         writeln!(f)?;
                         if let Some(handler) = &mut handler {
                             handler.show(f)?;
-                        } else {
-                            style.style(f, &wait_message)?;
+                            queue!(f, Clear(ClearType::FromCursorDown))?;
+                        } else if let Some(wait_message) = &wait_message {
+                            queue!(f, Clear(ClearType::FromCursorDown))?;
+                            style.style(f, wait_message)?;
                         }
                         enable_raw_mode()?;
                     }
@@ -329,7 +332,7 @@ where
         style.style(f, &EndInput)?;
         writeln!(f)?;
 
-        queue!(f, Show)?;
+        queue!(f, Clear(ClearType::FromCursorDown), Show)?;
 
         Ok(result)
     }

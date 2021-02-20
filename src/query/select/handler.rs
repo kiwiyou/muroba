@@ -13,7 +13,7 @@ pub trait SelectHandler {
     type Result;
 
     fn show(&mut self, f: &mut impl Write) -> Result<()>;
-    fn clear(&mut self, f: &mut impl Write) -> Result<()>;
+    fn rewind(&mut self, f: &mut impl Write) -> Result<()>;
     /// Handles a key event and returns `true` if redraw is required.
     ///
     /// It should only handle movement events, such as Up and Down key.
@@ -64,6 +64,7 @@ where
 
         for item in self.list.iter() {
             self.style.style(f, item)?;
+            queue!(f, Clear(ClearType::UntilNewLine))?;
             writeln!(f)?;
             printed_rows += 1;
         }
@@ -72,12 +73,11 @@ where
         Ok(())
     }
 
-    fn clear(&mut self, f: &mut impl Write) -> Result<()> {
+    fn rewind(&mut self, f: &mut impl Write) -> Result<()> {
         if self.last_printed_rows > 0 {
             queue!(
                 f,
                 MoveToPreviousLine(self.last_printed_rows),
-                Clear(ClearType::FromCursorDown),
             )?;
             self.last_printed_rows = 0;
         }
@@ -184,6 +184,7 @@ where
         let iter = self.list.iter().cycle().skip(start).take(count);
         for item in iter {
             self.style.style(f, item)?;
+            queue!(f, Clear(ClearType::UntilNewLine))?;
             writeln!(f)?;
             printed_rows += 1;
         }
@@ -192,12 +193,11 @@ where
         Ok(())
     }
 
-    fn clear(&mut self, f: &mut impl Write) -> Result<()> {
+    fn rewind(&mut self, f: &mut impl Write) -> Result<()> {
         if self.last_printed_rows > 0 {
             queue!(
                 f,
                 MoveToPreviousLine(self.last_printed_rows),
-                Clear(ClearType::FromCursorDown),
             )?;
             self.last_printed_rows = 0;
         }
