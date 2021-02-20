@@ -16,10 +16,10 @@ use crossterm::{
 use cursor::Show;
 
 use crate::{
-    item::{BeginInput, EndInput, ListItem, Prompt, WaitMessage},
+    item::{BeginInput, EndInput, ListItem, Overflow, Prompt, WaitMessage},
     query::Query,
     style::Styler,
-    Result,
+    util, Result,
 };
 
 use super::{FixedRowHandler, ListHandler, SelectHandler};
@@ -186,7 +186,11 @@ impl<'a, S, ListGen, HandlerGen> DynamicSelectQuery<'a, S, ListGen, HandlerGen> 
 
 impl<'a, S, T, H, ListGen, HandlerGen> Query for DynamicSelectQuery<'a, S, ListGen, HandlerGen>
 where
-    S: Styler<Prompt> + Styler<BeginInput> + Styler<EndInput> + Styler<WaitMessage>,
+    S: Styler<Prompt>
+        + Styler<BeginInput>
+        + Styler<EndInput>
+        + Styler<WaitMessage>
+        + Styler<Overflow>,
     H: SelectHandler<Result = Vec<(usize, String)>> + 'a,
     T: Send + 'static,
     ListGen: (Fn(String) -> Vec<T>) + Send + Sync + 'static,
@@ -235,7 +239,7 @@ where
                 queue!(f, MoveToPreviousLine(1))?;
                 style.style(f, &prompt)?;
                 style.style(f, &BeginInput)?;
-                queue!(f, Print(&input))?;
+                util::trim_print(style, f, &input)?;
                 style.style(f, &EndInput)?;
                 queue!(f, Clear(ClearType::UntilNewLine))?;
                 writeln!(f)?;
@@ -257,7 +261,7 @@ where
                     queue!(f, MoveToPreviousLine(1))?;
                     style.style(f, &prompt)?;
                     style.style(f, &BeginInput)?;
-                    queue!(f, Print(&input))?;
+                    util::trim_print(style, f, &input)?;
                     style.style(f, &EndInput)?;
                     queue!(f, Clear(ClearType::UntilNewLine))?;
                     writeln!(f)?;
@@ -303,7 +307,7 @@ where
                         queue!(f, MoveToPreviousLine(1))?;
                         style.style(f, &prompt)?;
                         style.style(f, &BeginInput)?;
-                        queue!(f, Print(&input))?;
+                        util::trim_print(style, f, &input)?;
                         style.style(f, &EndInput)?;
                         queue!(f, Clear(ClearType::UntilNewLine))?;
                         writeln!(f)?;
@@ -327,7 +331,7 @@ where
         style.style(f, &BeginInput)?;
         let result = (!result.is_empty()).then(|| result.remove(0).1);
         if let Some(item) = &result {
-            queue!(f, Print(&item))?;
+            util::trim_print(style, f, &item)?;
         }
         style.style(f, &EndInput)?;
         writeln!(f)?;

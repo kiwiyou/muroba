@@ -75,10 +75,7 @@ where
 
     fn rewind(&mut self, f: &mut impl Write) -> Result<()> {
         if self.last_printed_rows > 0 {
-            queue!(
-                f,
-                MoveToPreviousLine(self.last_printed_rows),
-            )?;
+            queue!(f, MoveToPreviousLine(self.last_printed_rows),)?;
             self.last_printed_rows = 0;
         }
         Ok(())
@@ -195,10 +192,7 @@ where
 
     fn rewind(&mut self, f: &mut impl Write) -> Result<()> {
         if self.last_printed_rows > 0 {
-            queue!(
-                f,
-                MoveToPreviousLine(self.last_printed_rows),
-            )?;
+            queue!(f, MoveToPreviousLine(self.last_printed_rows),)?;
             self.last_printed_rows = 0;
         }
         Ok(())

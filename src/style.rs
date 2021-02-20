@@ -8,7 +8,7 @@ use crossterm::{
     },
 };
 
-use crate::{item::*, Result};
+use crate::{item::*, util, Result};
 
 pub struct DefaultStyle;
 
@@ -85,12 +85,8 @@ impl Styler<ListItem> for DefaultStyle {
             queue!(f, Print("  "),)?;
         }
 
-        queue!(
-            f,
-            Print(&list_item.item),
-            ResetColor,
-            SetAttribute(Attribute::Reset)
-        )?;
+        util::trim_print(self, f, &list_item.item)?;
+        queue!(f, ResetColor, SetAttribute(Attribute::Reset))?;
 
         Ok(())
     }
@@ -104,5 +100,11 @@ impl Styler<WaitMessage> for DefaultStyle {
             ResetColor,
             SetAttribute(Attribute::Reset)
         )
+    }
+}
+
+impl Styler<Overflow> for DefaultStyle {
+    fn style(&self, f: &mut impl Write, _: &Overflow) -> Result<()> {
+        queue!(f, Print("…"))
     }
 }

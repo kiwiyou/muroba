@@ -34,3 +34,5 @@ pub struct ListItem {
 }
 
 pub struct WaitMessage(pub String);
+
+pub struct Overflow;
