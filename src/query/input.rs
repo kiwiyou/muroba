@@ -1,6 +1,16 @@
-use std::{ffi::OsString, io::{Write, Read}, path::Path, process};
+use std::{
+    ffi::OsString,
+    io::{Read, Write},
+    path::Path,
+    process,
+};
 
-use crossterm::{cursor::{self, Hide, Show}, event::{self, Event}, queue, terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType}};
+use crossterm::{
+    cursor::{self, Hide, Show},
+    event::{self, Event},
+    queue,
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
+};
 use cursor::MoveToColumn;
 use event::KeyCode;
 use process::Command;
@@ -173,7 +183,7 @@ pub struct EditorQuery {
 impl EditorQuery {
     pub fn with_editor<P>(self, path: P) -> Self
     where
-        P: AsRef<Path>
+        P: AsRef<Path>,
     {
         Self {
             editor: Some(path.as_ref().as_os_str().to_owned()),
@@ -181,9 +191,11 @@ impl EditorQuery {
     }
 
     fn editor(self) -> Command {
-        let prog = self.editor.or_else(|| std::env::var_os("VISUAL"))
-        .or_else(|| std::env::var_os("EDITOR"))
-        .unwrap_or(if cfg!(windows) { "notepad.exe" } else { "vi" }.into());
+        let prog = self
+            .editor
+            .or_else(|| std::env::var_os("VISUAL"))
+            .or_else(|| std::env::var_os("EDITOR"))
+            .unwrap_or_else(|| if cfg!(windows) { "notepad.exe" } else { "vi" }.into());
         Command::new(prog)
     }
 }
